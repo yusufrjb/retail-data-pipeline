@@ -1,0 +1,95 @@
+x-airflow-common:
+  &airflow-common
+  build: ./airflow
+  environment:
+    AIRFLOW__CORE__FERNET_KEY: "LHTifAUOolugY0CvyWy66j6WVC2aJv83Rgzigi5G2vI="
+    AIRFLOW__API__SECRET_KEY: "retail-airflow-secret-2026"
+    AIRFLOW__API_AUTH__JWT_SECRET: "93342600c2cbd2728faade3cf34e6ca23241cd3dfcfb6e1ae5a195508ffaa19d9b0377e01043030fbefcacc1cda7af5b"
+    AIRFLOW__CORE__INTERNAL_API_SECRET_KEY: "6243713f3710fae11da5cffa6110f748ee9218e35dc6b72ee27dcb32d8a4794cfaa19bc31bc30b1535daee86e4c79caa"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-api-server:8080/execution/"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    DBT_PROFILES_DIR: /home/airflow/.dbt
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./dbt/project:/opt/dbt
+    - ./dbt/.dbt:/home/airflow/.dbt
+  depends_on:
+    postgres-airflow:
+      condition: service_healthy
+
+services:
+  postgres-retail:
+    image: postgres:16
+    container_name: retail-postgres
+    environment:
+      POSTGRES_USER: yusufrjb
+      POSTGRES_PASSWORD: 0407084sd
+      POSTGRES_DB: retail_data
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_retail_data:/var/lib/postgresql/data
+  postgres-airflow:
+    image: postgres:16
+    container_name: retail-postgres-airflow
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_airflow_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  dbt:
+    build:
+      context: ./dbt
+    container_name: retail-dbt
+    volumes:
+      - ./dbt/project:/usr/app/dbt
+      - ./dbt/.dbt:/root/.dbt
+    working_dir: /usr/app/dbt/retail_dbt
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["tail", "-f", "/dev/null"]
+    
+  airflow-api-server:
+    <<: *airflow-common
+    container_name: retail-airflow-api-server
+    command: api-server
+    ports:
+      - "8080:8080"
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: retail-airflow-scheduler
+    command: scheduler
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: retail-airflow-dag-processor
+    command: dag-processor
+
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: retail-airflow-triggerer
+    command: triggerer
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: retail-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+
+volumes:
+  postgres_airflow_data:
+  postgres_retail_data:

@@ -1,0 +1,30 @@
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# Airflow runtime
+airflow/logs/
+airflow/plugins/__pycache__/
+
+# dbt credentials
+dbt/.dbt/profiles.yml
+dbt/.dbt/.user.yml
+
+# dbt generated files
+dbt/project/logs/
+dbt/project/retail_dbt/logs/
+dbt/project/retail_dbt/target/
+dbt/project/retail_dbt/dbt_packages/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
