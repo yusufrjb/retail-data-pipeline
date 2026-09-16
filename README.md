@@ -1,70 +1,75 @@
 # Retail Sales Data Pipeline
 
-An end-to-end data pipeline project for transforming retail transactional data into an analytics-ready warehouse using PostgreSQL, dbt, Apache Airflow, and Docker.
+An end-to-end data engineering project that transforms retail transactional data into an analytics-ready fact table using PostgreSQL, dbt, Apache Airflow, and Docker.
 
-## Overview
+## Project Overview
 
-This project demonstrates a simple but production-oriented data engineering workflow:
+This project demonstrates a practical data engineering workflow:
 
-**OLTP PostgreSQL → dbt Staging → dbt Transformation → Data Warehouse → Incremental Loading → Airflow Orchestration**
+**PostgreSQL OLTP → dbt Staging → dbt Mart → Warehouse → Incremental Processing → Airflow Orchestration**
 
 The project uses a retail sales scenario containing customers, products, orders, and order items. Transactional data is transformed into a warehouse-ready fact table for analytical use.
+
+**Project status:** Completed portfolio project
 
 ## Architecture
 
 ```text
-                  ┌─────────────────┐
-                  │   PostgreSQL    │
-                  │      OLTP       │
-                  │                 │
-                  │ customers       │
-                  │ products        │
-                  │ orders          │
-                  │ order_items     │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │   dbt Staging   │
-                  │                 │
-                  │ stg_orders      │
-                  │ stg_order_items │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │   dbt Marts     │
-                  │                 │
-                  │   fct_sales     │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Data Warehouse  │
-                  │    schema:      │
-                  │    warehouse    │
-                  └────────┬────────┘
-                           ▲
-                           │
-                  ┌────────┴────────┐
-                  │    Airflow      │
-                  │  Orchestration  │
-                  │                 │
-                  │ dbt run         │
-                  │ dbt test        │
-                  └─────────────────┘
+                  ┌─────────────────────┐
+                  │      PostgreSQL     │
+                  │        OLTP         │
+                  │                     │
+                  │ customers           │
+                  │ products            │
+                  │ orders              │
+                  │ order_items         │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │     dbt Staging     │
+                  │                     │
+                  │ stg_orders          │
+                  │ stg_order_items     │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │      dbt Mart       │
+                  │                     │
+                  │     fct_sales       │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ PostgreSQL Warehouse│
+                  │                     │
+                  │ schema: warehouse   │
+                  │ table: fct_sales    │
+                  └─────────────────────┘
+
+                  ┌─────────────────────┐
+                  │      Airflow        │
+                  │   Orchestration     │
+                  │                     │
+                  │     dbt run         │
+                  │        ↓            │
+                  │     dbt test        │
+                  └─────────────────────┘
 ```
+
+> The OLTP database and warehouse use the same PostgreSQL instance in this demonstration project. The `warehouse` schema separates the analytical model from the transactional tables.
 
 ## Tech Stack
 
 | Technology     | Purpose                                    |
 | -------------- | ------------------------------------------ |
-| PostgreSQL     | OLTP database and data warehouse           |
-| dbt            | Data transformation, modeling, testing     |
+| PostgreSQL     | Transactional database and warehouse       |
+| dbt            | Data transformation, modeling, and testing |
 | Apache Airflow | Pipeline orchestration                     |
 | Docker         | Reproducible development environment       |
 | SQL            | Data transformation and analytical queries |
-| Python         | Pipeline/orchestration configuration       |
+| Python         | Airflow DAG configuration                  |
 
 ## Data Model
 
@@ -77,15 +82,17 @@ The transactional database contains:
 * `orders`
 * `order_items`
 
-The schema uses primary keys and foreign keys to maintain relationships between entities.
+Primary keys and foreign keys are used to maintain relationships between entities.
 
 ### Warehouse
 
 The main analytical model is:
 
-`warehouse.fct_sales`
+```text
+warehouse.fct_sales
+```
 
-It combines completed orders with their order items and calculates:
+The fact table combines completed orders with their order items and calculates:
 
 ```text
 total_sales = quantity × unit_price
@@ -93,16 +100,16 @@ total_sales = quantity × unit_price
 
 Example columns:
 
-| Column          | Description                       |
-| --------------- | --------------------------------- |
-| `order_item_id` | Unique order item identifier      |
-| `order_id`      | Order identifier                  |
-| `customer_id`   | Customer identifier               |
-| `product_id`    | Product identifier                |
-| `sales_date`    | Date of sale                      |
-| `quantity`      | Quantity purchased                |
-| `unit_price`    | Product price at transaction time |
-| `total_sales`   | Calculated sales value            |
+| Column          | Description                        |
+| --------------- | ---------------------------------- |
+| `order_item_id` | Unique order item identifier       |
+| `order_id`      | Order identifier                   |
+| `customer_id`   | Customer identifier                |
+| `product_id`    | Product identifier                 |
+| `sales_date`    | Date of sale                       |
+| `quantity`      | Quantity purchased                 |
+| `unit_price`    | Price recorded at transaction time |
+| `total_sales`   | Calculated sales value             |
 
 ## dbt Transformation
 
@@ -110,13 +117,13 @@ The dbt project separates transformations into staging and mart layers.
 
 ### Staging
 
-`stg_orders`
+**`stg_orders`**
 
-Filters the source orders to completed transactions.
+Filters source orders to completed transactions.
 
-`stg_order_items`
+**`stg_order_items`**
 
-Calculates the sales amount for each order item.
+Calculates sales value for each order item:
 
 ```sql
 quantity * unit_price AS total_sales
@@ -124,43 +131,57 @@ quantity * unit_price AS total_sales
 
 ### Mart
 
-`fct_sales`
+**`fct_sales`**
 
 Joins the staging models into an analytics-ready fact table.
 
-The model is materialized as an **incremental model** using `order_item_id` as the unique key.
+The model uses dbt's **incremental materialization** with `order_item_id` as the `unique_key`.
 
-This allows newly arrived records to be processed without rebuilding the entire fact table.
+For incremental runs, records with an `order_item_id` greater than the current maximum in the target table are processed.
 
 ## Incremental Loading
 
-The pipeline supports incremental processing through dbt's `is_incremental()` logic.
+The pipeline uses dbt's `is_incremental()` logic to avoid rebuilding the entire fact table on every run.
 
-On the initial run, the fact table is created from the available source data.
-
-On subsequent runs, new order items are processed based on the current maximum `order_item_id`.
-
-Example workflow:
+### Workflow
 
 ```text
 Initial load
     ↓
-8 records in warehouse.fct_sales
+Existing OLTP transactions
+    ↓
+warehouse.fct_sales
     ↓
 New transaction arrives
     ↓
 dbt run
     ↓
-Only the new record is processed
+New order item is processed
     ↓
-9 records in warehouse.fct_sales
+Warehouse is updated
 ```
 
-For this demonstration, `order_item_id` is used as the incremental watermark. In a production environment, a timestamp such as `updated_at` may be more appropriate when late-arriving or updated records need to be handled.
+In the demonstration, a new transaction with `order_item_id = 12` was added to the warehouse through an incremental dbt run.
+
+### Incremental Strategy
+
+The current implementation uses:
+
+```text
+order_item_id
+```
+
+as the incremental watermark.
+
+This approach is suitable for the controlled demonstration dataset. In a production ingestion system, an `updated_at` timestamp or another reliable change-tracking mechanism would generally be preferable for handling late-arriving or updated records.
 
 ## Airflow Orchestration
 
-Apache Airflow is used to orchestrate the dbt workflow.
+Apache Airflow orchestrates the dbt workflow through the DAG:
+
+```text
+retail_dbt_pipeline
+```
 
 The DAG executes:
 
@@ -170,13 +191,13 @@ dbt run
 dbt test
 ```
 
-The dependency ensures that data transformation completes before data quality tests are executed.
+The dependency ensures that transformation completes before data quality tests are executed.
 
 ## Data Quality
 
-dbt tests are used to validate the transformed data.
+dbt tests are integrated into the pipeline so that data validation runs after transformation.
 
-The project demonstrates how transformation and data validation can be integrated into the same pipeline rather than relying entirely on manual SQL checks.
+This demonstrates a basic **transform → validate** workflow where data quality checks are part of the orchestration process rather than being performed only through manual SQL queries.
 
 ## Running the Project
 
@@ -186,13 +207,13 @@ The project demonstrates how transformation and data validation can be integrate
 * Docker Compose
 * Git
 
-### Start the services
+### Start the Services
 
 ```bash
 docker compose up -d
 ```
 
-Check running containers:
+Check the running containers:
 
 ```bash
 docker compose ps
@@ -200,11 +221,13 @@ docker compose ps
 
 ### Run dbt
 
+Check the dbt connection:
+
 ```bash
 docker compose exec dbt dbt debug
 ```
 
-Run the transformations:
+Run transformations:
 
 ```bash
 docker compose exec dbt dbt run
@@ -216,7 +239,7 @@ Run data quality tests:
 docker compose exec dbt dbt test
 ```
 
-### Run the Airflow pipeline
+### Run the Airflow Pipeline
 
 The Airflow DAG is:
 
@@ -230,9 +253,13 @@ It executes:
 dbt run → dbt test
 ```
 
+The Airflow web interface can be used to monitor DAG runs and task status.
+
 ## Example Result
 
-After an incremental transaction is added to the OLTP database, running the dbt pipeline updates the warehouse:
+After a new transaction is added to the OLTP database, the incremental dbt model updates the warehouse.
+
+Example:
 
 ```text
 warehouse.fct_sales
@@ -243,19 +270,19 @@ order_item_id | order_id | customer_id | product_id | total_sales
 11            | 8        | 3           | 2          | 44000.00
 ```
 
-This demonstrates the incremental loading workflow from transactional data into the warehouse.
+This demonstrates the flow of a newly arrived transactional record into the analytical warehouse.
 
 ## Key Concepts Demonstrated
 
 * Relational database design
 * Primary and foreign keys
-* OLTP vs OLAP
+* OLTP and OLAP concepts
 * Data warehouse modeling
 * Fact tables
 * SQL transformations
 * ETL / ELT concepts
 * dbt staging and mart models
-* Incremental data loading
+* Incremental data processing
 * Data quality testing
 * Apache Airflow orchestration
 * Dockerized data engineering environment
@@ -264,19 +291,19 @@ This demonstrates the incremental loading workflow from transactional data into 
 
 Potential extensions include:
 
-* Source data ingestion from REST APIs
+* REST API source ingestion
 * Incremental loading using `updated_at`
-* Dimension tables for customers and products
+* Customer and product dimension tables
 * Slowly Changing Dimensions (SCD)
 * BigQuery deployment
 * dbt documentation and lineage
 * CI/CD with GitHub Actions
-* Monitoring and pipeline alerting
+* Pipeline monitoring and alerting
 
 ## Author
 
 **Muhammad Yusuf Rajabiyah**
 
-Applied Data Science / Data Engineering Projects
+Data Engineering & Applied Data Science Projects
 
-GitHub: [github.com/yusufrjb](https://github.com/yusufrjb)
+GitHub: `yusufrjb`
